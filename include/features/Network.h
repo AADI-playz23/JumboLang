@@ -3,28 +3,31 @@
 #define JUMBOLANG_NETWORK_H
 
 #include <string>
-#include <vector>
-#include <netinet/in.h> // The Linux Header for internet protocols
+
+#ifdef _WIN32
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    typedef int socklen_t;
+    #define CLOSE_SOCKET closesocket
+#else
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <unistd.h>
+    #define CLOSE_SOCKET close
+    typedef int SOCKET;
+    #define INVALID_SOCKET -1
+#endif
 
 class NetworkManager {
 private:
-    int server_fd;
+    SOCKET server_fd;
     int port;
-    struct sockaddr_in address;
 
 public:
     NetworkManager(int p);
-    
-    // Feature: Standard HTTP/HTTPS Socket Initialization
     bool initializeSocket();
-    
-    // Feature: Bind the socket to the hardware
     bool bindToHardware();
-    
-    // Feature: Start listening for actual traffic
     void startListening();
-
-    // Feature: Close and cleanup
     void shutdown();
 };
 

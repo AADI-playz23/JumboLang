@@ -8,6 +8,9 @@
 #include <iostream>
 #include <string>
 
+// ---------------------------------------------------------
+// 1. FEATURE REGISTRY (The V1 Core)
+// ---------------------------------------------------------
 Interpreter::Interpreter() {
     featureRegistry["main"]  = [this](auto node) { this->handleMain(node); };
     featureRegistry["https"] = [this](auto node) { this->handleHttps(node); };
@@ -17,6 +20,9 @@ Interpreter::Interpreter() {
     featureRegistry["json"]  = [this](auto node) { this->handleJson(node); };
 }
 
+// ---------------------------------------------------------
+// 2. THE VIRTUAL MACHINE CORE
+// ---------------------------------------------------------
 void Interpreter::executeNode(std::shared_ptr<ASTNode> node) {
     if (!node) return;
     if (featureRegistry.count(node->tagName)) {
@@ -31,6 +37,10 @@ void Interpreter::run(std::shared_ptr<ASTNode> rootNode) {
     executeNode(rootNode);
     std::cout << "--- 🐘 EXECUTION FINISHED SUCCESSFULLY ---\n";
 }
+
+// ---------------------------------------------------------
+// 3. TAG HANDLERS
+// ---------------------------------------------------------
 
 void Interpreter::handleMain(std::shared_ptr<ASTNode> node) {
     std::cout << "[SYSTEM] Initializing Main App Space...\n";
@@ -91,13 +101,9 @@ void Interpreter::handleDb(std::shared_ptr<ASTNode> node) {
 }
 
 void Interpreter::handleJson(std::shared_ptr<ASTNode> node) {
-    std::string action = "parse";
-    if (node->attributes.count("action")) action = node->attributes["action"];
-    if (action == "parse") {
-        std::cout << "[JSON ENGINE] Parsing raw data...\n";
-        auto data = JSONManager::parse(node->bodyContent);
-        for (auto const& [key, val] : data) {
-            std::cout << "    📊 [EXTRACTED] " << key << " : " << val << "\n";
-        }
+    std::cout << "[JSON ENGINE] Parsing raw data...\n";
+    auto data = JSONManager::parse(node->bodyContent);
+    for (auto const& [key, val] : data) {
+        std::cout << "    📊 [EXTRACTED] " << key << " : " << val << "\n";
     }
 }
