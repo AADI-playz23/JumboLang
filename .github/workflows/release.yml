@@ -10,7 +10,7 @@ jobs:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false # Prevents one failure from killing the whole run
+      fail-fast: false 
       matrix:
         os: [ubuntu-latest, windows-latest]
 
@@ -18,14 +18,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- LINUX BUILD ---
       - name: Build JumboLang (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update && sudo apt-get install -y build-essential
           g++ src/*.cpp src/features/*.cpp -o jumbol -Iinclude -O3
 
-      # --- WINDOWS BUILD (Using MSYS2 for G++) ---
       - name: Set up MSYS2 (Windows)
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
@@ -38,7 +36,14 @@ jobs:
         run: |
           g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 -lws2_32
 
-      # --- RELEASE ---
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}
+          path: |
+            jumbol
+            jumbol.exe
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -49,7 +54,7 @@ jobs:
           name: JumboLang V1-Prototype-Cross
           body: |
             🐘 JumboLang V1 Prototype is officially Cross-Platform!
-            - Fixed: Strategy fail-fast error.
-            - Added: Windows MSYS2 build support.
+            - Fixed: GitHub Actions v3 Deprecation.
+            - Optimized: O(1) Interpreter Loop.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
