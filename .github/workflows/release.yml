@@ -9,8 +9,11 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # --- FIX: Permissions for creating releases ---
+    permissions:
+      contents: write
     strategy:
-      fail-fast: false 
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
 
@@ -18,12 +21,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # --- LINUX BUILD ---
       - name: Build JumboLang (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update && sudo apt-get install -y build-essential
           g++ src/*.cpp src/features/*.cpp -o jumbol -Iinclude -O3
 
+      # --- WINDOWS BUILD (Static Linking Fix) ---
       - name: Set up MSYS2 (Windows)
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
@@ -34,16 +39,10 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: msys2 {0}
         run: |
-          g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 -lws2_32
+          g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 \
+              -static -static-libgcc -static-libstdc++ -lws2_32
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: binary-${{ matrix.os }}
-          path: |
-            jumbol
-            jumbol.exe
-
+      # --- RELEASE STEP ---
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -51,10 +50,12 @@ jobs:
           files: |
             jumbol
             jumbol.exe
-          name: JumboLang V1-Prototype-Cross
+          fail_on_unmatched_files: false
+          name: JumboLang V1-Prototype-Portable
           body: |
-            🐘 JumboLang V1 Prototype is officially Cross-Platform!
-            - Fixed: GitHub Actions v3 Deprecation.
-            - Optimized: O(1) Interpreter Loop.
+            🐘 JumboLang V1.0.6 is officially Portable!
+            - Fixed: 'libstdc++-6.dll' and 'libgcc_s_seh-1.dll' not found errors.
+            - Fixed: GitHub 403 Permission error.
+            - Optimized: O(1) Hash Map tag lookups.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
