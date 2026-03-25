@@ -1,4 +1,3 @@
-// src/Interpreter.cpp
 #include "../include/Interpreter.h"
 #include "../include/features/Network.h"    
 #include "../include/features/AI.h"         
@@ -8,9 +7,6 @@
 #include <iostream>
 #include <string>
 
-// ---------------------------------------------------------
-// 1. FEATURE REGISTRY (The V1 Core Map)
-// ---------------------------------------------------------
 Interpreter::Interpreter() {
     featureRegistry["main"]  = [this](auto node) { this->handleMain(node); };
     featureRegistry["https"] = [this](auto node) { this->handleHttps(node); };
@@ -20,13 +16,12 @@ Interpreter::Interpreter() {
     featureRegistry["json"]  = [this](auto node) { this->handleJson(node); };
 }
 
-// ---------------------------------------------------------
-// 2. THE VIRTUAL MACHINE CORE
-// ---------------------------------------------------------
-void Interpreter::executeNode(std::shared_ptr<ASTNode> node) {
+// OPTIMIZED: Constant time lookup with no double-search
+void Interpreter::executeNode(const std::shared_ptr<ASTNode>& node) {
     if (!node) return;
-    if (featureRegistry.count(node->tagName)) {
-        featureRegistry[node->tagName](node);
+    auto it = featureRegistry.find(node->tagName);
+    if (it != featureRegistry.end()) {
+        it->second(node);
     } else {
         std::cerr << "⚠️ JumboLang Engine Warning: Unknown tag {" << node->tagName << "}\n";
     }
@@ -37,10 +32,6 @@ void Interpreter::run(std::shared_ptr<ASTNode> rootNode) {
     executeNode(rootNode);
     std::cout << "--- 🐘 EXECUTION FINISHED SUCCESSFULLY ---\n";
 }
-
-// ---------------------------------------------------------
-// 3. TAG HANDLERS (The Power Features)
-// ---------------------------------------------------------
 
 void Interpreter::handleMain(std::shared_ptr<ASTNode> node) {
     std::cout << "[SYSTEM] Initializing Main App Space...\n";
