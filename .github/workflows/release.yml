@@ -1,0 +1,50 @@
+name: JumboLang V1 Prototype Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers when you push a tag like v1.0.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Compile JumboLang
+        run: |
+          g++ src/main.cpp \
+              src/Lexer.cpp \
+              src/Parser.cpp \
+              src/Interpreter.cpp \
+              src/features/Network.cpp \
+              src/features/AI.cpp \
+              src/features/FileSystem.cpp \
+              src/features/Database.cpp \
+              src/features/JSON.cpp \
+              -o jumbol -Iinclude -O3
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: jumbol
+          name: JumboLang V1-Prototype-1
+          body: |
+            🐘 JumboLang V1 Prototype 1 is here!
+            
+            **Included Features:**
+            - Native Networking ({https})
+            - AI Routing Agent ({llm})
+            - Persistent Storage ({file})
+            - Key-Value Database ({db})
+            - Raw Data Handling ({json})
+            
+            **Installation:**
+            Download the `jumbol` binary below, give it permissions (`chmod +x jumbol`), and run your scripts!
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
