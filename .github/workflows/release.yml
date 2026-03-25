@@ -1,50 +1,42 @@
-name: JumboLang V1 Prototype Release
+name: JumboLang V1 Cross-Platform Release
 
 on:
   push:
     tags:
-      - 'v*' # Triggers when you push a tag like v1.0.1
+      - 'v*'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # FIX: Upgraded to v4
 
-      - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
-
-      - name: Compile JumboLang
+      - name: Build JumboLang (Linux)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          g++ src/main.cpp \
-              src/Lexer.cpp \
-              src/Parser.cpp \
-              src/Interpreter.cpp \
-              src/features/Network.cpp \
-              src/features/AI.cpp \
-              src/features/FileSystem.cpp \
-              src/features/Database.cpp \
-              src/features/JSON.cpp \
-              -o jumbol -Iinclude -O3
+          g++ src/*.cpp src/features/*.cpp -o jumbol -Iinclude -O3
+
+      - name: Build JumboLang (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 -lws2_32
 
       - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2 # FIX: Upgraded to v2
         with:
-          files: jumbol
-          name: JumboLang V1-Prototype-1
+          files: |
+            jumbol
+            jumbol.exe
+          name: JumboLang V1-Prototype-Cross
           body: |
-            🐘 JumboLang V1 Prototype 1 is here!
-            
-            **Included Features:**
-            - Native Networking ({https})
-            - AI Routing Agent ({llm})
-            - Persistent Storage ({file})
-            - Key-Value Database ({db})
-            - Raw Data Handling ({json})
-            
-            **Installation:**
-            Download the `jumbol` binary below, give it permissions (`chmod +x jumbol`), and run your scripts!
+            🐘 JumboLang V1 is now Cross-Platform!
+            - Linux Binary: `jumbol`
+            - Windows Executable: `jumbol.exe`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
