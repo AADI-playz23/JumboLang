@@ -9,7 +9,7 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # --- FIX: Permissions for creating releases ---
+    # --- FIX 1: GIVE THE ROBOT PERMISSION TO CREATE RELEASES ---
     permissions:
       contents: write
     strategy:
@@ -41,6 +41,15 @@ jobs:
         run: |
           g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 \
               -static -static-libgcc -static-libstdc++ -lws2_32
+
+      # --- FIX 2: UPGRADE TO V4 ARTIFACTS ---
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}
+          path: |
+            jumbol
+            jumbol.exe
 
       # --- RELEASE STEP ---
       - name: Create GitHub Release
