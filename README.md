@@ -1,43 +1,57 @@
 # 🐘 JumboLang (.jl)
+**The Sovereign, AI-Native Systems Language.**
 
-> The sovereign, high-performance systems language for the modern web.
+JumboLang is a high-performance backend language built in C++ designed to bridge the gap between the simplicity of Python and the raw power of C. It features a custom compiler pipeline (Lexer, Parser, AST) and a modular Virtual Machine.
 
-[![Build JumboLang Engine](https://github.com/YOUR_USERNAME/JumboLang/actions/workflows/build.yml/badge.svg)](https://github.com/YOUR_USERNAME/JumboLang/actions/workflows/build.yml)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/YOUR_USERNAME/JumboLang)
+## 🚀 Core Features
+- **Native AI Routing**: Built-in `{llm}` tags for zero-boilerplate AI integration (Gemini-ready).
+- **High-Speed Networking**: Direct Linux Socket integration for `{https}` and `{wss}` servers.
+- **Persistence Layer**: Native `{file}` system and `{db}` Key-Value storage.
+- **Data Native**: Built-in `{json}` parsing that handles raw web data safely.
+- **Memory Safe**: Utilizes C++ Smart Pointers for automatic resource management.
 
-JumboLang is a compiled, independent programming language built from the hardware up. It combines the declarative readability of markup tags (like HTML) with the clean logic of Python and the raw, unbottlenecked execution speed of C. 
+## 🛠️ Getting Started
 
-It is designed to be its own web server, its own VM manager, and its own LLM router—requiring zero external dependencies like Nginx, Apache, or massive node_modules folders.
+### Prerequisites
+- G++ Compiler (C++17 or higher)
+- Make
 
-## ✨ Key Features
+### Installation
+```bash
+git clone [https://github.com/AADI-playz23/JumboLang.git](https://github.com/AADI-playz23/JumboLang.git)
+cd JumboLang
+make build
 
-* **Sovereign Architecture:** Built from scratch starting at the Assembly level. No hidden runtimes.
-* **Native Networking:** Spin up asynchronous HTTPS servers, WebSockets, and TCP Tunnels directly at the language level.
-* **Built-in LLM Routing:** Native `{llm}` tags handle AI context and generation without messy API wrappers.
-* **Declarative Infrastructure:** Use `{tag} ... {-}` structures to configure heavy environments, and standard scripting inside to drive the logic.
-* **Standalone Executable:** Compile your `.jl` scripts and run them anywhere using the ultra-lightweight `jumbol` CLI.
 
-## 💻 Syntax Snapshot
+###Run a Script
 
-JumboLang makes complex backend microservices incredibly simple to read and write:
+./jumbol tests/app.jl
 
-```text
-// app.jl
+
+##📝 Example Syntax
 {main}
-    // Spin up a native HTTPS server
-    {https port=443 cert="./ssl/cert.pem"}
+    {https port="8080"}
+        {json action="parse"}
+            { "status": "active", "dev": "AADI" }
+        {-json}
         
-        // Handle LLM processing natively
-        {route path="/api/ask" method="POST"}
-            payload = request.body
-            
-            {llm model="gemini-pro" temp=0.7}
-                context = "You are a helpful AI backend assistant."
-                response = generate(payload.query, sys_prompt=context)
-            {-}
-            
-            return response.json()
-        {-route}
-
+        {llm model="gemini"}
+            Generate a welcome message for the user.
+        {-llm}
     {-https}
 {-main}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
