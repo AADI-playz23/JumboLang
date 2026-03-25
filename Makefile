@@ -1,7 +1,5 @@
 build:
-	nasm -f elf64 src/bootstrap.asm -o bootstrap.o
-	ld bootstrap.o -o jumbol
-	rm bootstrap.o
+	g++ src/main.cpp src/Lexer.cpp src/Parser.cpp src/Interpreter.cpp src/features/Network.cpp src/features/AI.cpp src/features/FileSystem.cpp src/features/Database.cpp src/features/JSON.cpp -o jumbol -Iinclude -O3
 
 run: build
-	./jumbol
+	./jumbol tests/app.jl
