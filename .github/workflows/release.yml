@@ -9,7 +9,7 @@ jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    # --- FIX 1: GIVE THE ROBOT PERMISSION TO CREATE RELEASES ---
+    # --- FIX 1: Explicitly grant Write permission for Releases ---
     permissions:
       contents: write
     strategy:
@@ -28,7 +28,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y build-essential
           g++ src/*.cpp src/features/*.cpp -o jumbol -Iinclude -O3
 
-      # --- WINDOWS BUILD (Static Linking Fix) ---
+      # --- WINDOWS BUILD (Static Linking Fix for DLL errors) ---
       - name: Set up MSYS2 (Windows)
         if: matrix.os == 'windows-latest'
         uses: msys2/setup-msys2@v2
@@ -42,7 +42,7 @@ jobs:
           g++ src/*.cpp src/features/*.cpp -o jumbol.exe -Iinclude -O3 \
               -static -static-libgcc -static-libstdc++ -lws2_32
 
-      # --- FIX 2: UPGRADE TO V4 ARTIFACTS ---
+      # --- FIX 2: UPGRADE TO V4 ARTIFACTS (Fixes your current error) ---
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -60,11 +60,11 @@ jobs:
             jumbol
             jumbol.exe
           fail_on_unmatched_files: false
-          name: JumboLang V1-Prototype-Portable
+          name: JumboLang V1.0.7 Portable Release
           body: |
-            🐘 JumboLang V1.0.6 is officially Portable!
-            - Fixed: 'libstdc++-6.dll' and 'libgcc_s_seh-1.dll' not found errors.
+            🐘 JumboLang V1.0.7 is officially Portable!
+            - Fixed: Deprecated Artifact Actions v3 error.
             - Fixed: GitHub 403 Permission error.
-            - Optimized: O(1) Hash Map tag lookups.
+            - Fixed: Missing DLL errors on Windows via static linking.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
