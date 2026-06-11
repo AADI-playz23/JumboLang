@@ -1,0 +1,109 @@
+name: JumboLang Cross-Platform Release
+
+# Triggered automatically when you push a tag like: v2.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ── LINUX BUILD ──────────────────────────────────────────────────────────
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libcurl4-openssl-dev
+
+      - name: Build JumboLang (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: make USE_CURL=1
+
+      # ── WINDOWS BUILD ─────────────────────────────────────────────────────────
+      - name: Set up MSYS2 (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-curl
+
+      - name: Build JumboLang (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: msys2 {0}
+        run: |
+          g++ src/main.cpp src/Lexer.cpp src/Parser.cpp src/Interpreter.cpp \
+              src/features/Network.cpp src/features/AI.cpp src/features/HTTP.cpp \
+              src/features/FileSystem.cpp src/features/Database.cpp src/features/JSON.cpp \
+              -o jumbol.exe -Iinclude -O2 -std=c++17 \
+              -DHAVE_CURL \
+              -static -static-libgcc -static-libstdc++ \
+              -lcurl -lws2_32 -lssl -lcrypto -lz -lcrypt32 -lwldap32
+
+      # ── UPLOAD ARTIFACTS ─────────────────────────────────────────────────────
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}
+          path: |
+            jumbol
+            jumbol.exe
+
+      # ── CREATE GITHUB RELEASE ────────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            jumbol
+            jumbol.exe
+          fail_on_unmatched_files: false
+          name: "JumboLang ${{ github.ref_name }}"
+          body: |
+            ## 🐘 JumboLang ${{ github.ref_name }}
+
+            ### What's New in v2.0
+            - ✅ **Real LLM API** — OpenAI, Anthropic (Claude), and OpenAI-compatible endpoints (Ollama, Groq, etc.)
+            - ✅ **`{fetch}` tag** — plain HTTP API calls (GET, POST, PUT, DELETE, PATCH)
+            - ✅ **Multi-threaded web server** — one thread per connection, no blocking
+            - ✅ **Auto Content-Type** detection (JSON vs HTML vs plain text)
+            - ✅ **Security** — path traversal prevention on `{file}`, shell metacharacter blocking on `{shell}`
+            - ✅ **Parser error recovery** — all errors reported at once, no more crashes
+            - ✅ **Performance** — `const shared_ptr&` handlers, zero unnecessary refcount bumps
+
+            ### Quick Start
+            ```bash
+            # Set your API key
+            export OPENAI_API_KEY="sk-..."
+
+            # Run a script
+            ./jumbol myapp.jl
+            ```
+
+            ### New `{llm}` providers
+            ```
+            {llm model="gpt-4o" provider="openai" store="result"} Hello! {-llm}
+            {llm model="claude-3-5-sonnet-20241022" provider="anthropic"} Hello! {-llm}
+            {llm model="llama3" provider="compatible" baseurl="http://localhost:11434/v1"} Hello! {-llm}
+            ```
+
+            ### New `{fetch}` tag
+            ```
+            {fetch url="https://api.example.com/data" method="GET" store="result"}{-fetch}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

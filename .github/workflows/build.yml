@@ -1,0 +1,21 @@
+name: Build JumboLang Core
+
+on: [push]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev
+
+      - name: Build Engine (with libcurl)
+        run: make USE_CURL=1
+
+      - name: Upload jumbol executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: jumbol-linux
+          path: jumbol

@@ -1,0 +1,23 @@
+# Compiled binaries
+jumbol
+a.out
+*.o
+*.out
+
+# Build artifacts
+build/
+dist/
+
+# Runtime / log files
+tunnel.log
+*.log
+*.jdb
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+*~
