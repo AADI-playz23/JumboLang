@@ -61,12 +61,72 @@
 
     </div>
 
-    <footer class="mt-16 text-center">
-        <a href="https://github.com/AADI-playz23/JumboLang/releases" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/20">
-            Download V2.0.0 Portable
-        </a>
-        <p class="mt-6 text-slate-500 text-sm">Maintained by AADI. Zero dependencies required.</p>
+    <!-- DIRECT DOWNLOADS SECTION -->
+    <section class="card mt-8">
+        <h2 class="text-2xl font-bold mb-4">📥 Direct Downloads</h2>
+        <p class="text-slate-400 mb-6">Download any version of JumboLang natively compiled for your OS. No DLLs, no dependencies needed.</p>
+        <div id="releases-container" class="space-y-4">
+            <div class="animate-pulse text-slate-500">Fetching releases from GitHub...</div>
+        </div>
+    </section>
+
+    <footer class="mt-16 text-center pb-8">
+        <p class="text-slate-500 text-sm">Maintained by AADI. Zero dependencies required.</p>
     </footer>
 
+    <script>
+        async function fetchReleases() {
+            const container = document.getElementById('releases-container');
+            try {
+                const res = await fetch('https://api.github.com/repos/AADI-playz23/JumboLang/releases');
+                const releases = await res.json();
+                
+                container.innerHTML = ''; // clear loading text
+
+                if (releases.length === 0) {
+                    container.innerHTML = '<p class="text-slate-400">No releases found.</p>';
+                    return;
+                }
+
+                releases.forEach(release => {
+                    // Find Windows and Linux assets
+                    const winAsset = release.assets.find(a => a.name === 'jumbol.exe');
+                    const linAsset = release.assets.find(a => a.name === 'jumbol');
+
+                    let buttonsHtml = '';
+                    if (winAsset) {
+                        buttonsHtml += `<a href="${winAsset.browser_download_url}" class="inline-flex items-center bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg mr-3 transition-colors text-sm shadow-lg shadow-blue-500/20"><svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.801"/></svg> Windows</a>`;
+                    }
+                    if (linAsset) {
+                        buttonsHtml += `<a href="${linAsset.browser_download_url}" class="inline-flex items-center bg-orange-600 hover:bg-orange-500 text-white font-semibold py-2 px-4 rounded-lg mr-3 transition-colors text-sm shadow-lg shadow-orange-500/20"><svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.666 17.666l-5.666-5.666-5.666 5.666-1.414-1.414 7.08-7.08 7.08 7.08-1.414 1.414z"/></svg> Linux</a>`;
+                    }
+                    if (!winAsset && !linAsset) {
+                        buttonsHtml = '<span class="text-slate-500 text-sm italic bg-slate-800/50 px-3 py-1 rounded">Binaries still building... check back in 1 minute.</span>';
+                    }
+
+                    const date = new Date(release.published_at).toLocaleDateString();
+
+                    const html = `
+                        <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between hover:border-slate-500 transition-colors">
+                            <div class="mb-4 md:mb-0">
+                                <h3 class="text-lg font-bold text-white flex items-center">
+                                    ${release.name} 
+                                    ${release.prerelease ? '<span class="ml-2 bg-yellow-600/20 text-yellow-500 text-xs px-2 py-0.5 rounded border border-yellow-500/30">Pre-release</span>' : ''}
+                                </h3>
+                                <div class="text-slate-400 text-sm mt-1">Released on ${date}</div>
+                            </div>
+                            <div class="flex items-center">
+                                ${buttonsHtml}
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += html;
+                });
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-400">Failed to load releases from GitHub. Please try again later.</p>';
+            }
+        }
+        fetchReleases();
+    </script>
 </body>
 </html>
