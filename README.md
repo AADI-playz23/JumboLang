@@ -28,19 +28,29 @@ make build
 ./jumbol tests/app.jl
 
 
-##📝 Example Syntax
+## 📝 Example Syntax
 {main}
+    // Set your API key directly in code or use ENV vars!
+    {llm model="gpt-4o" provider="openai" key="sk-your-key-here" store="ai_msg"}
+        Write a funny welcome message.
+    {-llm}
+    
+    // Fetch external data natively
+    {fetch url="https://api.github.com/users/AADI-playz23" method="GET" store="gh_data"}{-fetch}
+
+    // Fast C++ Multi-threaded Web Server
     {https port="8080"}
-        {json action="parse"}
-            { "status": "active", "dev": "AADI" }
-        {-json}
-        
-        {llm model="gemini"}
-            Generate a welcome message for the user.
-        {-llm}
+        {route path="/api"}
+            {json action="parse"}
+                {
+                    "status": "active",
+                    "dev": "AADI",
+                    "ai_response": "$ai_msg"
+                }
+            {-json}
+        {-route}
     {-https}
 {-main}
-
 
 
 

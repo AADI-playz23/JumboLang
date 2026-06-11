@@ -248,8 +248,16 @@ void Interpreter::handleLlm(const std::shared_ptr<ASTNode>& node) {
     AIManager ai(model, provider, customUrl);
 
     // Override which env variable to read the key from
-    if (node->attributes.count("envkey"))
+    if (node->attributes.count("envkey")) {
         ai.loadApiKeyFromEnv(node->attributes.at("envkey"));
+    }
+    
+    // Direct key passing
+    if (node->attributes.count("key")) {
+        ai.setApiKey(node->attributes.at("key"));
+    } else if (node->attributes.count("apikey")) {
+        ai.setApiKey(node->attributes.at("apikey"));
+    }
 
     if (!node->bodyContent.empty()) {
         std::string response = ai.generateResponse(node->bodyContent);
