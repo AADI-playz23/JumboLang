@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JumboLang | Portable AI-Native Language</title>
+    <title>JumboLang | Portable AI-Native Language v2.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
@@ -17,7 +17,7 @@
         <h1 class="text-6xl font-extrabold mb-4">🐘 <span class="gradient-text">JumboLang</span></h1>
         <p class="text-xl text-slate-400">The Sovereign, AI-Native Systems Language. Now 100% Portable.</p>
         <div class="mt-6">
-            <span class="bg-blue-600 text-white px-4 py-2 rounded-full font-mono text-sm">Version: v1.0.6-Portable</span>
+            <span class="bg-blue-600 text-white px-4 py-2 rounded-full font-mono text-sm">Version: v2.0.0</span>
             <span class="ml-3 bg-green-600/20 text-green-400 px-4 py-2 rounded-full text-sm border border-green-500/30">Build: Stable</span>
         </div>
     </header>
@@ -28,28 +28,31 @@
             <h2 class="text-2xl font-bold mb-4">🚀 Core Features</h2>
             <ul class="space-y-3">
                 <li class="flex items-center text-slate-300">✅ Native Portable Binaries (No DLLs)</li>
-                <li class="flex items-center text-slate-300">✅ AI Routing via <code class="ml-2 bg-slate-800 px-2 rounded">{llm}</code></li>
-                <li class="flex items-center text-slate-300">✅ Linux/Windows Sockets via <code class="ml-2 bg-slate-800 px-2 rounded">{https}</code></li>
+                <li class="flex items-center text-slate-300">✅ AI Routing via <code class="ml-2 bg-slate-800 px-2 rounded">{llm}</code> (OpenAI, Claude, Ollama)</li>
+                <li class="flex items-center text-slate-300">✅ Plain HTTP APIs via <code class="ml-2 bg-slate-800 px-2 rounded">{fetch}</code></li>
+                <li class="flex items-center text-slate-300">✅ Multi-threaded Sockets via <code class="ml-2 bg-slate-800 px-2 rounded">{https}</code></li>
                 <li class="flex items-center text-slate-300">✅ Key-Value Database & JSON Engine</li>
             </ul>
         </section>
 
         <section class="card">
-            <h2 class="text-2xl font-bold mb-4">📝 Changelog (v1.0.6)</h2>
+            <h2 class="text-2xl font-bold mb-4">📝 Changelog (v2.0.0)</h2>
             <div class="space-y-4">
                 <div>
                     <h3 class="text-blue-400 font-semibold underline decoration-2 underline-offset-4">Added</h3>
                     <ul class="list-disc list-inside text-slate-400 text-sm mt-1">
-                        <li>Static Linking: Runs on any Windows PC without extra files.</li>
-                        <li>Automated MSYS2 build pipeline for Windows v1.0.6.</li>
+                        <li>Real LLM API Support (OpenAI, Anthropic, Custom endpoints).</li>
+                        <li>New <code>{fetch}</code> tag for native GET/POST API calls.</li>
+                        <li>Multi-threaded web server for true concurrent requests.</li>
                     </ul>
                 </div>
                 <div>
-                    <h3 class="text-red-400 font-semibold underline decoration-2 underline-offset-4">Fixed</h3>
+                    <h3 class="text-green-400 font-semibold underline decoration-2 underline-offset-4">Improved</h3>
                     <ul class="list-disc list-inside text-slate-400 text-sm mt-1">
-                        <li>Fixed: Missing DLL system errors on Windows PCs.</li>
-                        <li>Fixed: GitHub Release 403 Permission denied errors.</li>
-                        <li>Fixed: Deprecated Artifact Actions v3 error.</li>
+                        <li>Security hardening (Path traversal, shell command injection prevention).</li>
+                        <li>Complete parser rewrite with graceful error recovery.</li>
+                        <li>Auto Content-Type detection in the built-in HTTP server.</li>
+                        <li>C++ Memory footprint optimizations (zero unnecessary refcount bumps).</li>
                     </ul>
                 </div>
             </div>
@@ -59,7 +62,7 @@
 
     <footer class="mt-16 text-center">
         <a href="https://github.com/AADI-playz23/JumboLang/releases" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/20">
-            Download V1.0.6 Portable
+            Download V2.0.0 Portable
         </a>
         <p class="mt-6 text-slate-500 text-sm">Maintained by AADI. Zero dependencies required.</p>
     </footer>
