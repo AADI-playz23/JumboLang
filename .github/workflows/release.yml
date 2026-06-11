@@ -41,6 +41,7 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-curl
+            mingw-w64-x86_64-pkgconf
 
       - name: Build JumboLang (Windows)
         if: matrix.os == 'windows-latest'
@@ -52,7 +53,7 @@ jobs:
               -o jumbol.exe -Iinclude -O2 -std=c++17 \
               -DHAVE_CURL -DCURL_STATICLIB \
               -static -static-libgcc -static-libstdc++ \
-              -lcurl -lws2_32 -lssl -lcrypto -lz -lcrypt32 -lwldap32
+              $(pkg-config --static --libs libcurl)
 
       # ── UPLOAD ARTIFACTS ─────────────────────────────────────────────────────
       - name: Upload Build Artifacts
