@@ -50,7 +50,7 @@ jobs:
               src/features/Network.cpp src/features/AI.cpp src/features/HTTP.cpp \
               src/features/FileSystem.cpp src/features/Database.cpp src/features/JSON.cpp \
               -o jumbol.exe -Iinclude -O2 -std=c++17 \
-              -DHAVE_CURL \
+              -DHAVE_CURL -DCURL_STATICLIB \
               -static -static-libgcc -static-libstdc++ \
               -lcurl -lws2_32 -lssl -lcrypto -lz -lcrypt32 -lwldap32
 
