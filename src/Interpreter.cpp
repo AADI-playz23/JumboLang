@@ -37,7 +37,7 @@ static auto trimWhitespace = [](std::string& s) {
 class MathEvaluator {
     std::string expr;
     size_t pos = 0;
-    std::unordered_map<std::string, std::string>& vars;
+    std::function<std::string(const std::string&)> getVar;
 
     double parseFactor() {
         while (pos < expr.size() && isspace(expr[pos])) pos++;
@@ -58,8 +58,9 @@ class MathEvaluator {
             std::string varName;
             while (pos < expr.size() && (isalnum(expr[pos]) || expr[pos] == '_'))
                 varName += expr[pos++];
-            if (vars.count(varName)) {
-                try { result = std::stod(vars[varName]); } catch (...) { result = 0; }
+            std::string v = getVar(varName);
+            if (!v.empty()) {
+                try { result = std::stod(v); } catch (...) { result = 0; }
             }
         } else {
             std::string numStr;
@@ -102,8 +103,8 @@ class MathEvaluator {
     }
 
 public:
-    MathEvaluator(std::string e, std::unordered_map<std::string, std::string>& v)
-        : expr(std::move(e)), vars(v) {}
+    MathEvaluator(std::string e, std::function<std::string(const std::string&)> getter)
+        : expr(std::move(e)), getVar(std::move(getter)) {}
 
     std::string evaluate() {
         bool hasMath = false;
@@ -114,7 +115,8 @@ public:
         if (!hasMath) {
             std::string t = expr;
             trimWhitespace(t);
-            if (vars.count(t)) return vars[t];
+            std::string v = getVar(t);
+            if (!v.empty() || t.empty()) return v.empty() ? t : v;
             return t;
         }
         try {
@@ -129,7 +131,7 @@ public:
 
 // ── Variable interpolator — replaces $varName with its value ─────────────────
 static std::string interpolate(const std::string& text,
-                               std::unordered_map<std::string, std::string>& vars) {
+                               std::function<std::string(const std::string&)> getVar) {
     std::string result;
     result.reserve(text.size());
     for (size_t i = 0; i < text.size(); ++i) {
@@ -139,7 +141,8 @@ static std::string interpolate(const std::string& text,
             while (i < text.size() && (isalnum(text[i]) || text[i] == '_'))
                 varName += text[i++];
             i--;
-            result += vars.count(varName) ? vars[varName] : ("$" + varName);
+            std::string v = getVar(varName);
+            result += !v.empty() ? v : ("$" + varName);
         } else {
             result += text[i];
         }
@@ -148,7 +151,63 @@ static std::string interpolate(const std::string& text,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHELL COMMAND SANITIZER
+// ARRAY ENCODING — arrays are stored as ordinary string variables joined by
+// the \x01 control byte (never appears in normal text), so no new value type
+// is needed and existing string-based vars/interpolation keep working.
+// ─────────────────────────────────────────────────────────────────────────────
+static const char ARR_SEP = '\x01';
+
+std::vector<std::string> Interpreter::arrToVec(const std::string& s) {
+    std::vector<std::string> out;
+    std::string cur;
+    for (char c : s) {
+        if (c == ARR_SEP) { out.push_back(cur); cur.clear(); }
+        else cur += c;
+    }
+    out.push_back(cur);
+    return out;
+}
+
+std::string Interpreter::vecToArr(const std::vector<std::string>& v) {
+    std::string out;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (i) out += ARR_SEP;
+        out += v[i];
+    }
+    return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCOPED VARIABLES — scopes.back() is current; lookups fall back to globals
+// (scopes.front()) so functions can read outer state but writes inside a
+// function go to the local scope unless the name already exists globally.
+// ─────────────────────────────────────────────────────────────────────────────
+bool Interpreter::hasVar(const std::string& name) const {
+    if (scopes.back().count(name)) return true;
+    return scopes.size() > 1 && scopes.front().count(name);
+}
+
+std::string Interpreter::getVar(const std::string& name) const {
+    auto& local = scopes.back();
+    auto it = local.find(name);
+    if (it != local.end()) return it->second;
+    if (scopes.size() > 1) {
+        auto git = scopes.front().find(name);
+        if (git != scopes.front().end()) return git->second;
+    }
+    return "";
+}
+
+void Interpreter::setVar(const std::string& name, const std::string& value) {
+    // If we're in a function scope and the name exists globally (but not
+    // locally), update the global so top-level state stays mutable.
+    if (scopes.size() > 1 && !scopes.back().count(name) && scopes.front().count(name)) {
+        scopes.front()[name] = value;
+        return;
+    }
+    scopes.back()[name] = value;
+}
+
 // Blocks the most dangerous shell metacharacters to mitigate injection risk.
 // The {shell} tag should never receive unsanitized user input, but this is
 // a defence-in-depth measure.
@@ -180,6 +239,8 @@ bool Interpreter::isSafeShellCommand(const std::string& cmd) {
 // INTERPRETER CONSTRUCTOR — registers all tags
 // ─────────────────────────────────────────────────────────────────────────────
 Interpreter::Interpreter() {
+    scopes.emplace_back(); // global scope
+
     featureRegistry["main"]   = [this](const auto& n) { handleMain(n);   };
     featureRegistry["llm"]    = [this](const auto& n) { handleLlm(n);    };
     featureRegistry["file"]   = [this](const auto& n) { handleFile(n);   };
@@ -201,6 +262,19 @@ Interpreter::Interpreter() {
 
     // V2.0: plain HTTP API calls
     featureRegistry["fetch"]  = [this](const auto& n) { handleFetch(n);  };
+
+    // V3.0: loops, functions, arrays
+    featureRegistry["for"]      = [this](const auto& n) { handleFor(n);      };
+    featureRegistry["while"]    = [this](const auto& n) { handleWhile(n);    };
+    featureRegistry["break"]    = [this](const auto& n) { handleBreak(n);    };
+    featureRegistry["continue"] = [this](const auto& n) { handleContinue(n); };
+    featureRegistry["func"]     = [this](const auto& n) { handleFunc(n);     };
+    featureRegistry["return"]   = [this](const auto& n) { handleReturn(n);   };
+    featureRegistry["call"]     = [this](const auto& n) { handleCall(n);     };
+    featureRegistry["array"]    = [this](const auto& n) { handleArray(n);    };
+    featureRegistry["push"]     = [this](const auto& n) { handlePush(n);     };
+    featureRegistry["get"]      = [this](const auto& n) { handleGet(n);      };
+    featureRegistry["len"]      = [this](const auto& n) { handleLen(n);      };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -211,8 +285,21 @@ void Interpreter::executeNode(const std::shared_ptr<ASTNode>& node) {
     auto it = featureRegistry.find(node->tagName);
     if (it != featureRegistry.end()) {
         it->second(node);
+    } else if (functions.count(node->tagName)) {
+        // Allow calling a user function directly as {funcname arg1="..." ...}
+        handleCall(node);
     } else {
         std::cerr << "⚠️  JumboLang Warning: Unknown tag {" << node->tagName << "}\n";
+    }
+}
+
+// Execute children in order, stopping early if a break/continue/return signal
+// is raised by a nested node (the signal propagates further up to the loop
+// or function call that handles it).
+void Interpreter::executeBlock(const std::vector<std::shared_ptr<ASTNode>>& children) {
+    for (const auto& child : children) {
+        executeNode(child);
+        if (flow != FlowSignal::NONE) return;
     }
 }
 
@@ -226,7 +313,7 @@ void Interpreter::run(std::shared_ptr<ASTNode> rootNode) {
 // V1.0 HANDLERS
 // ─────────────────────────────────────────────────────────────────────────────
 void Interpreter::handleMain(const std::shared_ptr<ASTNode>& node) {
-    for (const auto& child : node->children) executeNode(child);
+    executeBlock(node->children);
 }
 
 void Interpreter::handleLlm(const std::shared_ptr<ASTNode>& node) {
@@ -264,13 +351,13 @@ void Interpreter::handleLlm(const std::shared_ptr<ASTNode>& node) {
 
         // Optionally store the response in a JumboLang variable
         if (node->attributes.count("store")) {
-            variables[node->attributes.at("store")] = response;
+            setVar(node->attributes.at("store"), response);
         } else {
             std::cout << "    ✨ [AI] " << response << "\n";
         }
     }
 
-    for (const auto& child : node->children) executeNode(child);
+    executeBlock(node->children);
 }
 
 void Interpreter::handleFile(const std::shared_ptr<ASTNode>& node) {
@@ -314,14 +401,14 @@ void Interpreter::handleVar(const std::shared_ptr<ASTNode>& node) {
     std::string varName  = content.substr(0, eqPos);
     std::string varValue = content.substr(eqPos + 1);
     trimWhitespace(varName);
-    MathEvaluator eval(varValue, variables);
-    variables[varName] = eval.evaluate();
+    MathEvaluator eval(varValue, [this](const std::string& n){ return getVar(n); });
+    setVar(varName, eval.evaluate());
 }
 
 void Interpreter::handlePrint(const std::shared_ptr<ASTNode>& node) {
     std::string content = node->bodyContent;
     trimWhitespace(content);
-    content = interpolate(content, variables);
+    content = interpolate(content, [this](const std::string& n){ return getVar(n); });
     std::cout << "    🖨️  [PRINT] " << content << "\n";
 }
 
@@ -343,22 +430,81 @@ void Interpreter::handleShell(const std::shared_ptr<ASTNode>& node) {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGIC HANDLERS
 // ─────────────────────────────────────────────────────────────────────────────
-void Interpreter::handleIf(const std::shared_ptr<ASTNode>& node) {
-    lastIfCondition = false;
-    if (node->attributes.count("var") && node->attributes.count("equals")) {
-        const std::string& varName = node->attributes.at("var");
-        if (variables.count(varName) &&
-            variables[varName] == node->attributes.at("equals")) {
-            lastIfCondition = true;
+// ─────────────────────────────────────────────────────────────────────────────
+// CONDITION EVALUATION
+// Supported forms on a tag (e.g. {if ...} / {while ...}):
+//   var="x" equals="5"                → x == 5            (legacy, kept for compat)
+//   var="x" op="<" value="5"          → x < 5
+//   var="x" op="<" value="5" and_var="y" and_op=">" and_value="0"  → AND
+//   ...and_* may be replaced by or_* for OR-chaining (only one chain per tag)
+// op supports: == != < > <= >=  (numeric if both sides parse as numbers, else string compare)
+// ─────────────────────────────────────────────────────────────────────────────
+bool Interpreter::evalSingleCond(const std::string& lhs, const std::string& op, const std::string& rhs) {
+    // Try numeric comparison first
+    try {
+        size_t p1, p2;
+        double a = std::stod(lhs, &p1);
+        double b = std::stod(rhs, &p2);
+        if (p1 == lhs.size() && p2 == rhs.size()) {
+            if (op == "==") return a == b;
+            if (op == "!=") return a != b;
+            if (op == "<")  return a < b;
+            if (op == ">")  return a > b;
+            if (op == "<=") return a <= b;
+            if (op == ">=") return a >= b;
         }
+    } catch (...) { /* fall through to string compare */ }
+
+    if (op == "==") return lhs == rhs;
+    if (op == "!=") return lhs != rhs;
+    if (op == "<")  return lhs < rhs;
+    if (op == ">")  return lhs > rhs;
+    if (op == "<=") return lhs <= rhs;
+    if (op == ">=") return lhs >= rhs;
+    return false;
+}
+
+bool Interpreter::evalCondition(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+
+    // Legacy form: var="x" equals="5"  → equivalent to op "=="
+    std::string op = a.count("op") ? a.at("op") : "==";
+    std::string lhs, rhs;
+    bool have = false;
+
+    if (a.count("var")) {
+        lhs = getVar(a.at("var"));
+        rhs = a.count("equals") ? a.at("equals") : (a.count("value") ? a.at("value") : "");
+        have = true;
     }
-    if (lastIfCondition)
-        for (const auto& child : node->children) executeNode(child);
+    if (!have) return false;
+
+    bool result = evalSingleCond(lhs, op, rhs);
+
+    // Optional AND chain
+    if (a.count("and_var")) {
+        std::string l2 = getVar(a.at("and_var"));
+        std::string op2 = a.count("and_op") ? a.at("and_op") : "==";
+        std::string r2 = a.count("and_value") ? a.at("and_value") : "";
+        result = result && evalSingleCond(l2, op2, r2);
+    }
+    // Optional OR chain
+    if (a.count("or_var")) {
+        std::string l2 = getVar(a.at("or_var"));
+        std::string op2 = a.count("or_op") ? a.at("or_op") : "==";
+        std::string r2 = a.count("or_value") ? a.at("or_value") : "";
+        result = result || evalSingleCond(l2, op2, r2);
+    }
+    return result;
+}
+
+void Interpreter::handleIf(const std::shared_ptr<ASTNode>& node) {
+    lastIfCondition = evalCondition(node);
+    if (lastIfCondition) executeBlock(node->children);
 }
 
 void Interpreter::handleElse(const std::shared_ptr<ASTNode>& node) {
-    if (!lastIfCondition)
-        for (const auto& child : node->children) executeNode(child);
+    if (!lastIfCondition) executeBlock(node->children);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -377,8 +523,10 @@ void Interpreter::handleHttps(const std::shared_ptr<ASTNode>& node) {
             this->activeRoutePath    = path;
             this->activeRouteMethod  = method;
             this->currentHttpResponse = "";
+            this->flow = FlowSignal::NONE;
 
-            for (const auto& child : node->children) this->executeNode(child);
+            this->executeBlock(node->children);
+            this->flow = FlowSignal::NONE; // don't leak signals out of a request
 
             if (this->currentHttpResponse.empty()) {
                 return "{\"error\": \"404 Route Not Found in JumboLang\"}";
@@ -398,14 +546,14 @@ void Interpreter::handleRoute(const std::shared_ptr<ASTNode>& node) {
                        node->attributes.at("method") == activeRouteMethod;
 
     if (pathMatch && methodMatch) {
-        for (const auto& child : node->children) executeNode(child);
+        executeBlock(node->children);
     }
 }
 
 void Interpreter::handleRes(const std::shared_ptr<ASTNode>& node) {
     std::string content = node->bodyContent;
     trimWhitespace(content);
-    content = interpolate(content, variables);
+    content = interpolate(content, [this](const std::string& n){ return getVar(n); });
     currentHttpResponse += content;
 }
 
@@ -452,7 +600,7 @@ void Interpreter::handleFetch(const std::shared_ptr<ASTNode>& node) {
         method = node->attributes.at("method");
 
     // Interpolate $variables in the URL
-    url = interpolate(url, variables);
+    url = interpolate(url, [this](const std::string& n){ return getVar(n); });
 
     // Collect header_* attributes → headers map
     std::map<std::string, std::string> headers;
@@ -468,7 +616,7 @@ void Interpreter::handleFetch(const std::shared_ptr<ASTNode>& node) {
     // Body for POST/PUT/PATCH is the tag's body content
     std::string body = node->bodyContent;
     trimWhitespace(body);
-    body = interpolate(body, variables);
+    body = interpolate(body, [this](const std::string& n){ return getVar(n); });
 
     std::cout << "    🌐 [FETCH] " << method << " " << url << "\n";
 
@@ -484,9 +632,194 @@ void Interpreter::handleFetch(const std::shared_ptr<ASTNode>& node) {
 
     // Store raw response body in a variable if requested
     if (node->attributes.count("store")) {
-        variables[node->attributes.at("store")] = resp.body;
+        setVar(node->attributes.at("store"), resp.body);
     } else if (resp.success) {
         // Print to console if no store target
         std::cout << "    📥 [FETCH] Response:\n" << resp.body << "\n";
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3.0 — LOOPS
+// {for var="i" from="0" to="10" step="1"} ... {-for}   (inclusive bounds, step default 1)
+// {while ...condition attrs (see evalCondition)...} ... {-while}
+// {break}{-break}  {continue}{-continue}
+// ─────────────────────────────────────────────────────────────────────────────
+void Interpreter::handleFor(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    std::string varName = a.count("var") ? a.at("var") : "i";
+    double from = a.count("from") ? std::stod(a.at("from")) : 0;
+    double to   = a.count("to")   ? std::stod(a.at("to"))   : 0;
+    double step = a.count("step") ? std::stod(a.at("step")) : 1;
+    if (step == 0) step = 1;
+
+    for (double v = from; (step > 0) ? (v <= to) : (v >= to); v += step) {
+        std::string s = std::to_string(v);
+        s.erase(s.find_last_not_of('0') + 1, std::string::npos);
+        if (!s.empty() && s.back() == '.') s.pop_back();
+        setVar(varName, s);
+
+        executeBlock(node->children);
+
+        if (flow == FlowSignal::BREAK)    { flow = FlowSignal::NONE; break; }
+        if (flow == FlowSignal::CONTINUE) { flow = FlowSignal::NONE; continue; }
+        if (flow == FlowSignal::RETURN)   return; // propagate to enclosing function
+    }
+}
+
+void Interpreter::handleWhile(const std::shared_ptr<ASTNode>& node) {
+    const int MAX_ITER = 1000000; // safety guard against infinite loops
+    int iter = 0;
+    while (evalCondition(node)) {
+        if (++iter > MAX_ITER) {
+            std::cerr << "    ⚠️  [WHILE] Aborted after " << MAX_ITER << " iterations (possible infinite loop).\n";
+            break;
+        }
+        executeBlock(node->children);
+
+        if (flow == FlowSignal::BREAK)    { flow = FlowSignal::NONE; break; }
+        if (flow == FlowSignal::CONTINUE) { flow = FlowSignal::NONE; continue; }
+        if (flow == FlowSignal::RETURN)   return;
+    }
+}
+
+void Interpreter::handleBreak(const std::shared_ptr<ASTNode>&)    { flow = FlowSignal::BREAK; }
+void Interpreter::handleContinue(const std::shared_ptr<ASTNode>&) { flow = FlowSignal::CONTINUE; }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3.0 — FUNCTIONS
+// {func name="add" params="a,b"} ... {return}a + b{-return} ... {-func}
+// {return}expr{-return}
+// {call name="add" args="1,2" store="result"}{-call}
+// Functions get a fresh local scope; globals remain readable/writable via
+// getVar/setVar's fallback rules.
+// ─────────────────────────────────────────────────────────────────────────────
+void Interpreter::handleFunc(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    if (!a.count("name")) {
+        std::cerr << "    ⚠️  [FUNC] {func} requires a 'name' attribute.\n";
+        return;
+    }
+    std::vector<std::string> params;
+    if (a.count("params")) {
+        std::stringstream ss(a.at("params"));
+        std::string p;
+        while (std::getline(ss, p, ',')) { trimWhitespace(p); if (!p.empty()) params.push_back(p); }
+    }
+    functions[a.at("name")] = { params, node };
+}
+
+void Interpreter::handleReturn(const std::shared_ptr<ASTNode>& node) {
+    std::string content = node->bodyContent;
+    trimWhitespace(content);
+    content = interpolate(content, [this](const std::string& n){ return getVar(n); });
+    MathEvaluator eval(content, [this](const std::string& n){ return getVar(n); });
+    returnValue = eval.evaluate();
+    flow = FlowSignal::RETURN;
+}
+
+void Interpreter::handleCall(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    std::string name = a.count("name") ? a.at("name") : node->tagName;
+
+    auto it = functions.find(name);
+    if (it == functions.end()) {
+        std::cerr << "    ⚠️  [CALL] Unknown function '" << name << "'.\n";
+        return;
+    }
+    const auto& [params, funcNode] = it->second;
+
+    // Evaluate args in the CALLER's scope before pushing the new one.
+    std::vector<std::string> argVals;
+    if (a.count("args")) {
+        std::stringstream ss(a.at("args"));
+        std::string arg;
+        while (std::getline(ss, arg, ',')) {
+            trimWhitespace(arg);
+            arg = interpolate(arg, [this](const std::string& n){ return getVar(n); });
+            MathEvaluator eval(arg, [this](const std::string& n){ return getVar(n); });
+            argVals.push_back(eval.evaluate());
+        }
+    }
+
+    // New local scope for the function body
+    scopes.emplace_back();
+    for (size_t i = 0; i < params.size(); ++i)
+        scopes.back()[params[i]] = (i < argVals.size()) ? argVals[i] : "";
+
+    returnValue.clear();
+    executeBlock(funcNode->children);
+    if (flow == FlowSignal::RETURN) flow = FlowSignal::NONE; // return stops at the function boundary
+
+    scopes.pop_back();
+
+    if (a.count("store")) setVar(a.at("store"), returnValue);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// V3.0 — ARRAYS (stored as \x01-joined strings in regular variables)
+// {array} name = item1, item2, item3 {-array}
+// {push var="list"}value{-push}
+// {get var="list" index="0" store="x"}{-get}
+// {len var="list" store="n"}{-len}
+// ─────────────────────────────────────────────────────────────────────────────
+void Interpreter::handleArray(const std::shared_ptr<ASTNode>& node) {
+    std::string content = node->bodyContent;
+    size_t eqPos = content.find('=');
+    if (eqPos == std::string::npos) {
+        std::cerr << "    ⚠️  [SYNTAX] {array} expects 'name = item1, item2, ...'\n";
+        return;
+    }
+    std::string name = content.substr(0, eqPos);
+    trimWhitespace(name);
+
+    std::vector<std::string> items;
+    std::stringstream ss(content.substr(eqPos + 1));
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        trimWhitespace(item);
+        item = interpolate(item, [this](const std::string& n){ return getVar(n); });
+        items.push_back(item);
+    }
+    setVar(name, vecToArr(items));
+}
+
+void Interpreter::handlePush(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    if (!a.count("var")) { std::cerr << "    ⚠️  [PUSH] {push} requires a 'var' attribute.\n"; return; }
+    std::string value = node->bodyContent;
+    trimWhitespace(value);
+    value = interpolate(value, [this](const std::string& n){ return getVar(n); });
+
+    std::string current = getVar(a.at("var"));
+    auto items = current.empty() ? std::vector<std::string>{} : arrToVec(current);
+    items.push_back(value);
+    setVar(a.at("var"), vecToArr(items));
+}
+
+void Interpreter::handleGet(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    if (!a.count("var") || !a.count("index")) {
+        std::cerr << "    ⚠️  [GET] {get} requires 'var' and 'index' attributes.\n";
+        return;
+    }
+    auto items = arrToVec(getVar(a.at("var")));
+    std::string idxExpr = interpolate(a.at("index"), [this](const std::string& n){ return getVar(n); });
+    MathEvaluator idxEval(idxExpr, [this](const std::string& n){ return getVar(n); });
+    int idx = 0;
+    try { idx = (int)std::stod(idxEval.evaluate()); } catch (...) { idx = 0; }
+    std::string result = (idx >= 0 && idx < (int)items.size()) ? items[idx] : "";
+
+    if (a.count("store")) setVar(a.at("store"), result);
+    else std::cout << "    📋 [GET] " << result << "\n";
+}
+
+void Interpreter::handleLen(const std::shared_ptr<ASTNode>& node) {
+    const auto& a = node->attributes;
+    if (!a.count("var")) { std::cerr << "    ⚠️  [LEN] {len} requires a 'var' attribute.\n"; return; }
+    std::string val = getVar(a.at("var"));
+    int n = val.empty() ? 0 : (int)arrToVec(val).size();
+
+    if (a.count("store")) setVar(a.at("store"), std::to_string(n));
+    else std::cout << "    📏 [LEN] " << n << "\n";
 }

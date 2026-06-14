@@ -9,7 +9,7 @@
 
 // Tags whose body is raw data (not nested JumboLang blocks).
 // They consume everything verbatim until their closing tag.
-const std::set<std::string> RAW_TAGS = {"json", "file", "db"};
+const std::set<std::string> RAW_TAGS = {"json", "file", "db", "return", "array", "push"};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEBUG PRINTER
