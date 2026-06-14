@@ -1,6 +1,6 @@
 name: JumboLang Cross-Platform Release
 
-# Triggered automatically when you push a tag like: v2.0.0
+# Triggered automatically when you push a tag like: v3.0.0
 on:
   push:
     tags:
@@ -77,34 +77,13 @@ jobs:
           body: |
             ## 🐘 JumboLang ${{ github.ref_name }}
 
-            ### What's New in v2.0
-            - ✅ **Real LLM API** — OpenAI, Anthropic (Claude), and OpenAI-compatible endpoints (Ollama, Groq, etc.)
-            - ✅ **`{fetch}` tag** — plain HTTP API calls (GET, POST, PUT, DELETE, PATCH)
-            - ✅ **Multi-threaded web server** — one thread per connection, no blocking
-            - ✅ **Auto Content-Type** detection (JSON vs HTML vs plain text)
-            - ✅ **Security** — path traversal prevention on `{file}`, shell metacharacter blocking on `{shell}`
-            - ✅ **Parser error recovery** — all errors reported at once, no more crashes
-            - ✅ **Performance** — `const shared_ptr&` handlers, zero unnecessary refcount bumps
-
             ### Quick Start
-            ```bash
+```bash
             # Set your API key
             export OPENAI_API_KEY="sk-..."
 
             # Run a script
             ./jumbol myapp.jl
-            ```
+```
 
-            ### New `{llm}` providers
-            ```
-            {llm model="gpt-4o" provider="openai" store="result"} Hello! {-llm}
-            {llm model="claude-3-5-sonnet-20241022" provider="anthropic"} Hello! {-llm}
-            {llm model="llama3" provider="compatible" baseurl="http://localhost:11434/v1"} Hello! {-llm}
-            ```
-
-            ### New `{fetch}` tag
-            ```
-            {fetch url="https://api.example.com/data" method="GET" store="result"}{-fetch}
-            ```
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            ### `{llm}` providers
